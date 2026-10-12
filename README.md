@@ -2,7 +2,7 @@
 
   **Repositorio:** `<!-- TODO: PENDIENTE DE AÑADIT -->`
 
-## 0. Configuración adicional en el entorno
+## Configuración adicional en el entorno
 
 La práctica recomienda lanzar el contenedor con `docker run --rm`, lo que borra el contenedor (y todo lo que hayas hecho dentro) al salir. Antes de empezar quise tener una carpeta permanente donde guardar el código y los resultados sin perderlos. Esto es lo que investigué:
 
@@ -28,3 +28,72 @@ La práctica recomienda lanzar el contenedor con `docker run --rm`, lo que borra
 ### ¿Por qué esta solución y no un `docker cp` al final?
 
 Aunque no es una diferencia dramática, por preferencia personal me quedo con esta forma de trabajar ya que me parece más natural trabajar simplemente desde esa carpeta, guardándose en el host en tiempo real. No hay que acordarse de copiar nada y, si el contenedor falla o se cierra (con `--rm` ya no se puede hacer `docker cp`), no se pierde trabajo. Además, puedo editar desde el IDE del host y ejecutar dentro del contenedor sobre los mismos archivos, que ya quedan listos para `git` y para el zip de Moodle.
+
+## Ejercicio 1: Comandos básicos de YARP en la línea de comandos
+
+### 1. Verificar el entorno de YARP
+
+* **`yarp check`**: ejecuta un diagnóstico del entorno: comprueba la instalación, la red y si el servidor de nombres es alcanzable, y hace una prueba de comunicación entre puertos.
+
+![](img/04-yarpcheck.png)
+
+* **`yarp conf <hostname> <port>`**: guarda en la configuración local la dirección (IP y puerto) del servidor de nombres al que se conectarán los programas YARP de esa máquina.
+
+### 2. Iniciar y verificar el servidor de nombres
+
+* **`yarpserver`**: arranca el servidor de nombres, que registra los puertos y resuelve dónde está cada uno para poder conectarlos. Podemos acceder a la interfaz usando la dirección y puerto donde se ha levantado el servicio.
+![](img/05-yarpserver.png)
+
+* **`yarp where`**: muestra dónde está el servidor de nombres que se está usando (IP y puerto). Como el servidor está levantado en otra sesion del contenedor, al ejecutar el comando en un nuevo terminal, detecta esta localización, Nótese que coincide con la IP y puerto donde se levantó el servicio.
+![](img/06-yarpwhere.png)
+
+### 3. Crear y manipular puertos
+
+* **`yarp write /example/writer`**: crea un puerto de escritura y envía a través de él lo que se escribe por teclado.
+* **`yarp read /example/reader`**: crea un puerto de lectura que imprime en la terminal lo que recibe.
+![](img/07-yarpmessages.png)
+
+* **`yarp connect /example/writer /example/reader`**: conecta un puerto de salida con uno de entrada, de modo que lo escrito en el primero llega al segundo. Nótese que sin esto, los mensajes enviados por el writer no llegarán al reader.
+* **`yarp disconnect /example/writer /example/reader`**: elimina esa conexión, sin cerrar los puertos.
+* **`yarp name list`**: lista los puertos registrados en el servidor de nombres. Nótese que se puede apreciar cómo Yarp les da un puerto distinto y secuencial dentro de la dicrección IP local.
+![](img/08-yarpnamelist.png)
+
+### 4. Pruebas y diagnóstico
+
+* **`yarp ping /example/reader`**: comprueba que el puerto responde y muestra su información (dirección y conexiones). Para ello el puerto debe estar abierto.
+* **`yarp read /example/reader`**: *ver Ejercicio 3*.
+* **`yarp write /example/writer`** : *ver Ejercicio 3*.
+
+### 5. Manipulación avanzada de puertos
+
+* **`yarp write --anon`**: no parece funcionar. En la documentacion (https://www.yarp.it/latest/group__yarp.html#yarp_write) tampoco parece indicar la existencia de esta configuración.
+![](img/09-yarp-anon.png)
+
+* **`yarp name register /my/port`**: reserva un nombre en el servidor de nombres. De nuevo, Yarp asigna un puerto distinto y secuencial dentro de la dicrección IP local.
+* **`yarp name unregister /my/port`**: borra ese nombre del servidor de nombres.
+
+### 6. Limpiar el estado del servidor de nombres
+
+* **`yarp clean`**: revisa los puertos registrados y elimina los que ya no responden. En mi caso, ha borrado el puerto creado con yarp name register, que no estaba siendo usado, simplemente fue definidio.
+![](img/10-yarp-clean.png)
+
+### 7. Redes distribuidas
+
+* **`yarp check --remote <hostname>:<port>`**: parece ignorar los parámetros y simplemente hace un yarp check. Tampoco aparece en la documentación.
+![](img/11-yarpcheck--remote.png)
+
+
+* **`yarp name reconfigure <port> <new-server>`**: no parece funcionar y tampoco aparece en la documentación.
+
+### 8. Configuración básica de puertos desde la línea de comandos
+
+(Comandos ejecutados previamente)
+
+### Preguntas
+
+* **¿Qué sucede si intentas enviar un mensaje antes de conectar los puertos?** Que el mensaje no llega a ninguna parte.
+* **¿Cómo se desconectan los puertos desde la terminal?** Con yarp disconnect /sender /receiver.
+* **Si creas un segundo lector `/receiver2` y lo conectas al escritor, ¿ambos reciben el mensaje?** Sí. Un puerto de salida envía una copia a cada conexión que tenga, así que /receiver y /receiver2 reciben el mismo mensaje.
+
+
+## Ejercicios 2: Uso de Puertos en Yarp
