@@ -97,3 +97,37 @@ Aunque no es una diferencia dramática, por preferencia personal me quedo con es
 
 
 ## Ejercicios 2: Uso de Puertos en Yarp
+
+Como el script del receiver no contiene un bucle como el sender, se puede observar que simplemente se ejecuta y capta un mensaje puntual antes de llegar a la instrucción de cerrar el puerto y terminar el programa.
+![](img/12-yarp-ejercicio2.png)
+
+### Preguntas
+
+* **¿Que sucede si los puertos no se conectan?** Que el mensaje no llega a ninguna parte, de forma similar a como pasaba por comando de terminal.
+* **¿Cómo podrías modificar el nodo receptor para manejar múltiples mensajes con diferentes formatos?** Comprobando el posible tipo de cada elemento con get(i) y los métodos de Value (isString(), isInt32()... etc) según la documentacion en https://www.yarp.it/latest/classyarp_1_1os_1_1Value.html.
+
+
+```cpp
+// Leer los mensajes recibidos
+bool fin = false;
+while (!fin && input.read(bot)){
+    for (size_t i = 0; i < bot.size(); i++){
+        Value& v = bot.get(i);
+        if (v.isString()) {
+            std::cout << "[texto] " << v.asString() << std::endl;
+            if (v.asString().find("Sequence complete") != std::string::npos)
+                fin = true;
+        }
+        else if (v.isInt32()) std::cout << "[entero] " << v.asInt32() << std::endl;
+    }
+}
+  ```
+
+  ![](img/13-yarp-types.png)
+
+## 2.1. Conexión Directa entre Puertos en YARP
+
+// de la clase: cuidado con el setStrict que tiene truco, mirar el manual
+
+// del discord: no es necesario hacer los ejercicios 5 y 6, cuando se revise ROS 2 se volverá para comparar
+
