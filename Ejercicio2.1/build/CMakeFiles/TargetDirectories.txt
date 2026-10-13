@@ -1,0 +1,3 @@
+/workspace/Ejercicio2.1/build/CMakeFiles/sender_and_receiver.dir
+/workspace/Ejercicio2.1/build/CMakeFiles/edit_cache.dir
+/workspace/Ejercicio2.1/build/CMakeFiles/rebuild_cache.dir

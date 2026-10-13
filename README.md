@@ -92,7 +92,7 @@ Aunque no es una diferencia dramática, por preferencia personal me quedo con es
 ### Preguntas
 
 * **¿Qué sucede si intentas enviar un mensaje antes de conectar los puertos?** Que el mensaje no llega a ninguna parte.
-* **¿Cómo se desconectan los puertos desde la terminal?** Con yarp disconnect /sender /receiver.
+* **¿Cómo se desconectan los puertos desde la terminal?** Con `yarp disconnect /sender /receiver`.
 * **Si creas un segundo lector `/receiver2` y lo conectas al escritor, ¿ambos reciben el mensaje?** Sí. Un puerto de salida envía una copia a cada conexión que tenga, así que /receiver y /receiver2 reciben el mismo mensaje.
 
 
@@ -104,7 +104,7 @@ Como el script del receiver no contiene un bucle como el sender, se puede observ
 ### Preguntas
 
 * **¿Que sucede si los puertos no se conectan?** Que el mensaje no llega a ninguna parte, de forma similar a como pasaba por comando de terminal.
-* **¿Cómo podrías modificar el nodo receptor para manejar múltiples mensajes con diferentes formatos?** Comprobando el posible tipo de cada elemento con get(i) y los métodos de Value (isString(), isInt32()... etc) según la documentacion en https://www.yarp.it/latest/classyarp_1_1os_1_1Value.html.
+* **¿Cómo podrías modificar el nodo receptor para manejar múltiples mensajes con diferentes formatos?** Comprobando el posible tipo de cada elemento con `get(i)` y los métodos de `Value (isString(), isInt32()... etc)` según la documentacion en https://www.yarp.it/latest/classyarp_1_1os_1_1Value.html.
 
 
 ```cpp
@@ -127,7 +127,103 @@ while (!fin && input.read(bot)){
 
 ## 2.1. Conexión Directa entre Puertos en YARP
 
-// de la clase: cuidado con el setStrict que tiene truco, mirar el manual
+![](img/14-sender-and-receiver.png)
 
-// del discord: no es necesario hacer los ejercicios 5 y 6, cuando se revise ROS 2 se volverá para comparar
+### Preguntas
+
+* **¿Cuáles son los pasos realizados?**
+  1. Se inicializa YARP (Network yarp;).
+  2. Se crean dos `BufferedPort<Bottle>, writerPort y readerPort`, y se abren con los nombres /example/writer y /example/reader.
+  3. Se conecta el escritor con el lector desde el código con `writerPort.addOutput("/example/reader")`.
+  4. Se prepara el mensaje `(prepare(), clear(), addString("Hello, YARP!"))` y se envía con `write()`.
+  5. El lector lo recibe con `read()` y se imprime: `Received message :"Hello, YARP!"`.
+  6. Se cierran los dos puertos, y en la captura se ve cómo YARP elimina la conexión.
+
+* **¿Cuál es la diferencia entre Network::connect y Port::addOutput?** `Network::connect(origen, destino)` es una función estática de red que conecta dos puertos por su nombre. `addOutput(destino)` es un método de un puerto concreto que añade una conexión de salida desde ese puerto hacia otro.
+* **¿Cómo cambiarías los `cout` por mensajes de logging?** Usar las funcionalidades que ofrece Yarp es interesante porque, según la documentación (https://www.yarp.it/latest/yarp_logging.html), además de recolectar varios tipos de información, se ofrece la opción de mandarlos al yarplogger. De los 6 distintos niveles del logging que muestra la documentación, se ha probado `yInfo`, `yWarning` y `yError`. Como se ha usado la forma con `<<`, ha sido necesario incluir la librería `<yarp/os/LogStream.h>`. Además, se puede observar que Yarp usa este tipo de logging (en concreto [INFO]) para mostrar información adicional sobre los procesos como cerrar puertos. 
+
+![](img/15-yarp-logging.png)
+
+## Ejercicios 3. BufferedPort en YARP
+
+![](img/16-yarp-bufferedPort.png)
+
+### Preguntas
+
+* **Descripción del programa:** En un mismo programa se crean dos `BufferedPort<Bottle>`, `/example/sender` y `/example/receiver`, y se conectan con `Network::connect`. El emisor prepara una botella con `prepare()`, le añade la cadena `"Hello , BufferedPort !"` y la envía con `write()`. El receptor la recoge con `read()`, que devuelve un puntero a la botella (o `nullptr` si no hay), y la imprime. Por último se cierran los dos puertos. En la captura se ve el mensaje recibido y cómo YARP elimina la conexión al cerrar.
+
+* **Lo más característico:** El `BufferedPort<Bottle>` que guarda los mensajes en un búfer interno, facilitando atomaticamente la sincronización entre el envío y la recepción de datos, y evitando el bloqueo del flujo del programa.
+
+### Ejercicio Propuesto: Uso de BufferedPort en Comunicación Simultánea
+
+**Objetivo:** Practicar el uso de BufferedPort para manejar la comunicación entre varios productores y un único consumidor.
+
+El programa (`bufferedPortSync.cpp`) crea dos productores (`/producer1`, `/producer2`) y un consumidor (`/consumer`), todos `BufferedPort<Bottle>`, y conecta ambos productores al consumidor.
+
+![](img/17%2018%20good.png)
+
+### Preguntas
+
+* **Descripción del proceso:** En cada ronda, los dos productores envían un mensaje y el consumidor hace dos `read()` para mostrarlos. Sin un time delay entre los dos envíos, el programa se quedaba bloqueado ya que los mensajes llegaban casi a la vez, uno se descartaba y el segundo `read()` esperaba indefinidamente. Según la docuemntacion (https://www.yarp.it/latest/classyarp_1_1os_1_1BufferedPort.html), esto podría explicase con "messages may be dropped by the writer if BufferedPort::write is called too quickly The reader may also drop old messages if BufferedPort::read is not called fast enough". Añadiendo un pequeño `Time::delay` entre ambos envíos los mensajes ya no coinciden y se reciben todos en perfecto orden.
+
+* **Código clave:**
+
+  ```diff
+   for (int i = 1; i <= top; i++) {
+        // El productor 1 envia su mensaje
+        Bottle& msg1 = producer1.prepare();
+        msg1.clear();
+        msg1.addString("Mensaje de producer1");
+        msg1.addInt32(i);
+        producer1.write();
+
+  +      Time::delay(loop_delay/10);
+
+        // El productor 2 envia su mensaje
+        Bottle& msg2 = producer2.prepare();
+        msg2.clear();
+        msg2.addString("Mensaje de producer2");
+        msg2.addInt32(i);
+        producer2.write();
+
+        // El consumidor lee los dos mensajes de esta ronda y los muestra
+        for (int j = 0; j < 2; j++) {
+            Bottle* received = consumer.read();
+            if (received != nullptr) {
+                std::cout << "Consumer received : " << received->toString() << std::endl;
+            }
+        }
+
+        // Espera antes de la siguiente ronda
+        Time::delay(loop_delay);
+    }
+  ```
+
+## Ejercicios 4: Tiempo real en YARP
+
+**Objetivo:** El objetivo del ejercicio es diseñar un programa en YARP que permita gestionar el comportamiento por defecto en las colas de mensajes.
+
+Con el código base, `setStrict(true)` o `setStrict(false)` daba igual ya que el receptor lee en un bucle infinito sin pausa, mientras que el cuello de botella está en el sender, que espera entre envíos. El receptor siempre está listo antes de que llegue el siguiente mensaje, así que se reciben todos:
+
+![](img/19-yarp-strict-no-effect.png)
+
+Para que se note el parámetro hay que invertir la situación, haciendo que el receptor tarde más en procesar (time delay más alto en este caso) que el sender en enviar.
+
+* **`setStrict(false)`:** el receptor solo recibe uno de cada dos mensajes (1, 2, 4, 6, 8…). Los mensajes que llegan sin haberse leído se descartan y siempre se procesa el más reciente.
+
+  ![](img/20-yarp-strict-false.png)
+
+* **`setStrict(true)`:** el receptor recibe todos los mensajes en orden (1, 2, 3, 4…), pero se va quedando atrás: cuando el sender va por el 17, el receptor solo ha mostrado hasta el 9. Los mensajes pendientes se acumulan en el búfer.
+
+  ![](img/21-yarp-strict-true.png)
+
+### Preguntas
+
+* **Puerto del emisor (`/sender`):** gestionar la frecuencia de emisión de información, ya que esto puede saturar al receptor y, según la configuración, perder información relevante.
+
+* **Puerto del receptor (`/receiver`):** tener en cuenta una posible saturación debido a que la velocidad de procesamiento sea menor a la velocidad de emisión del sender y actuar en consecuecnia con una configuración adecuada.
+
+* **Frecuencia de envío:** Como se ha explicado previamente, una frecuencia demasiado alta puede saturar al receptor y perderinformación relevante.
+
+* **Ventajas y desventajas de `setStrict()`:** con `true` no se pierde ningún mensaje y se procesan en orden, pero si el receptor es más lento que el emisor, acumula retraso y trabaja con datos cada vez más antiguos. Con `false` (por defecto) el receptor siempre trabaja con el dato más reciente y sin retraso, que es lo que interesa en tiempo real (control, sensores), a costa de perder mensajes intermedios.
 

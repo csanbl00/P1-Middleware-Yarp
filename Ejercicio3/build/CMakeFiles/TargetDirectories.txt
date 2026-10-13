@@ -1,0 +1,4 @@
+/workspace/Ejercicio3/build/CMakeFiles/bufferedPort.dir
+/workspace/Ejercicio3/build/CMakeFiles/bufferedPortSync.dir
+/workspace/Ejercicio3/build/CMakeFiles/edit_cache.dir
+/workspace/Ejercicio3/build/CMakeFiles/rebuild_cache.dir
